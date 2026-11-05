@@ -10,7 +10,7 @@
 | 远端仓库 | `zer0zzh/secagent`，**Public**，空仓库（size=0），默认分支 `main` |
 | 本地 remote | `origin https://github.com/zer0zzh/secagent.git`（**干净 URL，不含任何凭据**） |
 | 本地分支 | `main`（已对齐远端默认分支） |
-| 待推提交 | 4 个：`fa0da1f` / `4c42f9e` / `e339bc2` / `3a32929` |
+| 待推提交 | 以 `git log --oneline` 为准（基线 `fa0da1f` 起，本文相关提交含 `3a32929` 起的文档/脚本提交） |
 | 受控文件 | 34 个，`.git` 约 210 KB |
 | 单测 | `python -m unittest discover -s tests` → 7 tests OK |
 | 密钥扫描 | 无硬编码密钥；`.env` / `runs/` / `data/` 忽略生效 |
