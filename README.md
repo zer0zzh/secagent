@@ -84,6 +84,29 @@ run_start → system_prompt → [llm_request → llm_response → decision → t
 
 参数里出现 `;` `|` `&&` `$(` 反引号 `file://` `gopher://` 等一律拒绝执行，拒绝原因回灌给模型。
 
+## 阶段1 工程纪律（先想清楚，再动手，最后验证）
+
+五份文档，按顺序读，改需求先改文档再动代码：
+
+| 阶段 | 文档 |
+|---|---|
+| 1 需求与范围 | `docs/phase1/01-scope.md`（给谁用 / 解决什么 / 绝对不做什么 / P0~P2 / 5 条用户故事 / 验收线） |
+| 2 设计 | `docs/phase1/02-design.md`（8 张表的数据模型 + 技术选型 + 明确不选什么） |
+| 3 任务拆解 | `docs/phase1/03-tasks.md`（T0~T9，每任务独立验收命令 + 提交信息 + 依赖图） |
+| 4 编码与自测 | `docs/phase1/04-implementation-log.md`（实测输出与提交哈希） |
+| 5 部署与复盘 | `docs/phase1/05-deploy-and-retro.md`（环境变量清单 + 阶段0 六个真实卡点） |
+
+Git 已初始化，一个任务一个提交；`.env` / `runs/` / `data/` 均已忽略。
+
+T1 数据层已落地：
+
+```bash
+python -m unittest discover -s tests -v          # 7 tests, OK
+python -m agent.store init                       # 建 8 张表
+python -m agent.store import runs/run-20261105-090111/trace.jsonl
+python -m agent.store summary                    # runs=1 steps=3 tool_calls=2
+```
+
 ## 已知限制（阶段0 有意保留）
 
 - 单线程、无流式；每步重发全量 messages，步数多了 token 线性涨。
