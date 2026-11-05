@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>WorkBuddy 免密钥通道 · 连通性探针</title>
+<style>
+  body{font:14px/1.7 -apple-system,"Segoe UI","PingFang SC",sans-serif;max-width:760px;margin:32px auto;padding:0 18px;color:#1a1c1f;background:#f7f8fa}
+  h1{font-size:18px;margin:0 0 6px}
+  .hint{color:#6b7280;font-size:12.5px;margin-bottom:18px}
+  fieldset{border:1px solid #e5e7eb;border-radius:10px;background:#fff;padding:14px 16px;margin-bottom:14px}
+  legend{font-size:12px;color:#6b7280;padding:0 6px}
+  label{display:block;font-size:12px;color:#4b5158;margin:8px 0 3px}
+  input{width:100%;box-sizing:border-box;padding:7px 9px;border:1px solid #d8dee8;border-radius:7px;font:13px/1.5 ui-monospace,Consolas,monospace}
+  button{margin-top:10px;padding:8px 16px;border:0;border-radius:8px;background:#2f6fed;color:#fff;font-size:13px;cursor:pointer}
+  button:disabled{background:#9db4e3;cursor:not-allowed}
+  pre{background:#1e2329;color:#e6edf3;padding:13px;border-radius:9px;overflow:auto;font-size:12.5px;line-height:1.6;min-height:60px}
+  .ok{color:#0f9d76;font-weight:600}.bad{color:#d13c3c;font-weight:600}
+</style>
+</head>
+<body>
+<h1>WorkBuddy 免密钥通道 · 连通性探针</h1>
+<p class="hint">
+  这个通道只能在<b>浏览器</b>里用：请求会带 Origin，服务端按应用发布域名做精确匹配。
+  所以它是“验证账号侧通道可用”的工具，不是 Python CLI 的生产接入路径。
+  先开通云服务拿到 <code>endpoint</code> / <code>publishableKey</code>，再打开本页。
+</p>
+
+<fieldset>
+  <legend>publicConfig</legend>
+  <label>endpoint</label>
+  <input id="endpoint" placeholder="https://xxxx.workbuddy.link">
+  <label>publishableKey</label>
+  <input id="key" placeholder="pk_...">
+  <label>model（留空则先拉模型列表）</label>
+  <input id="model" placeholder="留空自动选第一个可用模型">
+  <button id="run">开始测试</button>
+</fieldset>
+
+<pre id="out">等待测试…</pre>
+
+<script src="https://cdn.jsdelivr.net/npm/@tencent-ai/workbuddy-cloud-sdk@dev/lib/index.global.js"></script>
+<script>
+const out = document.getElementById('out');
+const log = (s, cls) => {
+  const el = document.createElement('span');
+  if (cls) el.className = cls;
+  el.textContent = s + '\n';
+  out.appendChild(el);
+};
+document.getElementById('run').onclick = async () => {
+  out.textContent = '';
+  const endpoint = document.getElementById('endpoint').value.trim();
+  const publishableKey = document.getElementById('key').value.trim();
+  let model = document.getElementById('model').value.trim();
+  if (!endpoint || !publishableKey) { log('endpoint 和 publishableKey 都必须填', 'bad'); return; }
+
+  const btn = document.getElementById('run');
+  btn.disabled = true;
+  const t0 = performance.now();
+  try {
+    const cloud = WorkBuddyCloud.createWorkBuddyCloud({ endpoint, publishableKey });
+    log('① 客户端已初始化');
+
+    if (!model) {
+      const models = await cloud.llm.models.list();
+      log(`② 模型目录：${models.length} 个`);
+      const usable = models.filter(m => m.disabled !== true && m.enabled !== false);
+      if (!usable.length) { log('没有可用模型', 'bad'); return; }
+      model = usable[0].id;
+      log(`   选中 ${model}（${usable[0].name || usable[0].id}）`);
+    }
+
+    let text = '';
+    let usage = null;
+    for await (const chunk of cloud.llm.chat.completions.create({
+      model,
+      messages: [
+        { role: 'system', content: 'You are a connectivity probe. Reply with the single token PONG.' },
+        { role: 'user', content: 'connectivity probe: reply PONG' },
+      ],
+      stream: true,
+      stream_options: { include_usage: true },
+      temperature: 0.2,
+      max_tokens: 64,
+    })) {
+      const d = chunk.choices?.[0]?.delta;
+      if (d?.content) text += d.content;
+      if (chunk.usage) usage = chunk.usage;
+    }
+    log(`③ 回复：${text || '(空)'}`);
+    if (usage) log(`   tokens: ${usage.total_tokens}`);
+    log(`④ 耗时 ${Math.round(performance.now() - t0)} ms`, 'ok');
+  } catch (e) {
+    log(`失败：${e?.error?.code || e?.name || 'unknown'} — ${e?.error?.message || e?.message}`, 'bad');
+    if (e?.requestId) log(`requestId: ${e.requestId}`);
+    if (String(e?.error?.code || '').startsWith('auth_')) {
+      log('auth_ 前缀 = 凭据或 Origin 不匹配：确认页面是从该应用的发布域名打开的，而不是本地文件。', 'bad');
+    }
+  } finally {
+    btn.disabled = false;
+  }
+};
+</script>
+</body>
+</html>

@@ -1,0 +1,89 @@
+# =============================================================================
+# LLM 接口配置 · 阶段0（只有配置，没有接入逻辑）
+# 语法：${ENV_NAME} 或 ${ENV_NAME:-默认值}  →  加载时展开为环境变量值
+# 敏感值一律写 ${VAR}，真实密钥只放 .env，不进这个文件
+# =============================================================================
+version: 1
+
+# 当前生效档案；被环境变量 SECAGENT_PROFILE 覆盖
+active: ${SECAGENT_PROFILE:-mock}
+
+# -----------------------------------------------------------------------------
+# 全局默认请求参数：profile 里没写的字段，用这里的值
+# -----------------------------------------------------------------------------
+defaults:
+  temperature: 0.2        # 采样温度；安全场景建议 0~0.3，越低越稳
+  top_p: 0.95             # 核采样；与 temperature 二选一调节
+  max_tokens: 2048        # 单次回复上限；ReAct 单步建议 ≤1024
+  stop: []                # 停止序列
+  stream: false           # 阶段0 只支持非流式；阶段1 再接 SSE
+  timeout_s: 60           # 单次请求超时（秒）
+  max_retries: 2          # 失败重试次数（仅对 5xx / 超时生效）
+  retry_backoff_s: 1.5    # 退避基数：第 n 次重试等待 1.5^n 秒
+  extra_headers: {}       # 透传头，如 {"X-Trace-Id": "..."}
+  extra_body: {}          # 厂商私有字段，原样并入请求体
+
+# -----------------------------------------------------------------------------
+# 档案（profile）：一个 profile = 一套 provider + 模型 + 参数的组合
+# provider 取值：mock | workbuddy | openai_compatible
+# -----------------------------------------------------------------------------
+profiles:
+
+  # ---- 本地回环：阶段0 用它验证"配置→请求→响应"整条链路 ----
+  mock:
+    provider: mock
+    model: mock-react-1
+    base_url: http://127.0.0.1:8770
+    api_key: ${SECAGENT_MOCK_KEY:-not-needed}
+    description: 本地假服务，回显请求并返回固定 JSON，用来验证链路与日志
+
+  # ---- WorkBuddy 免密钥通道：浏览器 SDK 专用，CLI 不可直连 ----
+  # endpoint / publishableKey 来自云服务 publicConfig；model 从 models.list() 选后回填
+  workbuddy:
+    provider: workbuddy
+    model: ${SECAGENT_WB_MODEL:-}
+    base_url: ${SECAGENT_WB_ENDPOINT:-}
+    api_key: ${SECAGENT_WB_PUBLISHABLE_KEY:-}
+    runtime: browser-sdk      # 仅 browser-sdk / miniprogram；Node/Python 直连会被 Origin 校验拒绝
+    params:
+      temperature: 0.6
+      max_tokens: 1024
+
+  # ---- DeepSeek 官方 API：阶段1 的主力接入目标 ----
+  deepseek:
+    provider: openai_compatible
+    model: ${SECAGENT_LLM_DEEPSEEK_MODEL:-deepseek-chat}
+    base_url: https://api.deepseek.com/v1
+    api_key: ${DEEPSEEK_API_KEY}
+    params:
+      temperature: 0.2
+      max_tokens: 2048
+      extra_body:
+        # DeepSeek 私有开关示例：思维链模型返回 reasoning_content
+        thinking:
+          type: disabled
+
+  # ---- 任意 OpenAI 兼容网关（vLLM / one-api / 中转）----
+  openai_compatible:
+    provider: openai_compatible
+    model: ${SECAGENT_LLM_OAI_MODEL:-gpt-4o-mini}
+    base_url: ${SECAGENT_LLM_OAI_BASE_URL:-https://api.openai.com/v1}
+    api_key: ${OPENAI_API_KEY}
+    params:
+      temperature: 0.2
+      max_tokens: 2048
+
+  # ---- 本机 ollama：阶段0 的真模型验证环境（无需密钥、可断网）----
+  # 已装模型：qwen2.5:7b-instruct / qwen2.5:3b-instruct / bge-m3
+  # 模型仓库路径：E:\ollama-models（环境变量 OLLAMA_MODELS）
+  # 启动：E:\Ollama\ollama.exe serve
+  ollama:
+    provider: openai_compatible
+    model: ${SECAGENT_LLM_OLLAMA_MODEL:-qwen2.5:7b-instruct}
+    base_url: http://127.0.0.1:11434/v1
+    api_key: ollama          # ollama 不校验，占位即可（客户端会自动跳过 Authorization）
+    params:
+      temperature: 0.2
+      max_tokens: 1024
+      timeout_s: 180
+      max_retries: 1
