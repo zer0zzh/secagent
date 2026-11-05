@@ -41,11 +41,18 @@ secagent/
 │   │       └── remote.py         # workbuddy 通道占位（浏览器限定，CLI 不实现）
 │   └── tools/registry.py     # 工具白名单 + allowlist + 危险模式拦截 + 截断
 ├── lab/www/                  # 演示靶场静态页
+├── lab/nmap_react/           # 教学件：单 Agent + 真实 Nmap（独立目录，不进主链路）
+│   ├── nmap_tool.py          # 授权闸门 + 固定命令模板 + XML → evidence
+│   └── react_agent.py        # ReAct 循环 + 证据核验 + trace + 反例复现
 ├── runs/                     # 每次运行的 trace.jsonl（已 gitignore）
+├── tests/                    # test_store.py + test_nmap_react.py
 ├── tools/
 │   ├── mock_llm_server.py    # 本地 OpenAI 兼容假服务
 │   └── workbuddy_probe.html  # WorkBuddy 免密钥通道网页探针（需 publicConfig）
-└── docs/llm-config.md        # 配置字段全表 + 换真实服务的方法
+└── docs/
+    ├── llm-config.md              # 配置字段全表 + 换真实服务的方法
+    ├── git-to-github.md           # GitHub 推送与同步流程
+    └── react-single-agent-nmap.md # 单 Agent 接真实安全工具：设计/实测/话术
 ```
 
 ## 循环怎么工作
@@ -102,7 +109,7 @@ Git 已初始化，一个任务一个提交；`.env` / `runs/` / `data/` 均已�
 T1 数据层已落地：
 
 ```bash
-python -m unittest discover -s tests -v          # 7 tests, OK
+python -m unittest discover -s tests -v          # 24 tests, OK（store 7 + nmap_react 17）
 python -m agent.store init                       # 建 8 张表
 python -m agent.store import runs/run-20261105-090111/trace.jsonl
 python -m agent.store summary                    # runs=1 steps=3 tool_calls=2
@@ -127,3 +134,17 @@ SECAGENT_PROFILE=deepseek python -m agent.cli probe
 ```
 
 配置字段全表见 `docs/llm-config.md`。
+
+## 附：Nmap ReAct 教学 Demo（`lab/nmap_react/`）
+
+**单 Agent + 一个真实安全工具（Nmap 7.40）+ 结果核验**，独立目录、只用标准库、可单文件拷走现场讲。不改动上面的主链路。
+
+```bash
+python lab/nmap_react/nmap_tool.py 127.0.0.1 8080,11434       # 单测工具层
+python lab/nmap_react/react_agent.py --demo-unreliable        # 4/4 幻觉结论被拦（无需 LLM）
+python lab/nmap_react/react_agent.py "对 127.0.0.1 的 8080,11434 端口做服务识别并给出结论"
+```
+
+实测 2 步收敛 / 26.7 s / trace 12 事件 6,002 B；授权闸门拒绝公网目标、参数注入与全端口扫描。
+完整设计、数据契约、代码讲解、失败记录、30 秒演示话术与资产清单见 `docs/react-single-agent-nmap.md`。
+
