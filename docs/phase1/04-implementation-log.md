@@ -36,7 +36,7 @@
 | 哈希 | 任务 | 信息 |
 |---|---|---|
 | `fa0da1f` | T0 | `chore: baseline phase0 (ReAct loop + trace) and phase1 design docs` |
-| 见 `git log` | T1 | `feat(store): sqlite schema + trace importer` |
+| `4c42f9e` | T1 | `feat(store): sqlite schema + trace importer + 7 unit tests` |
 
 ## 下一任务
 
