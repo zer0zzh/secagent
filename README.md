@@ -97,6 +97,7 @@ run_start → system_prompt → [llm_request → llm_response → decision → t
 | 5 部署与复盘 | `docs/phase1/05-deploy-and-retro.md`（环境变量清单 + 阶段0 六个真实卡点） |
 
 Git 已初始化，一个任务一个提交；`.env` / `runs/` / `data/` 均已忽略。
+推到 GitHub 的完整流程（含本机实测状态、PAT、报错对照）见 `docs/git-to-github.md`。
 
 T1 数据层已落地：
 
